@@ -67,6 +67,212 @@ index 8a07bd8..f00c7ad 100644
  void cs40l26_add_codec_devices(struct device *dev);
  
  /* external tables */
+diff --git a/google-modules/bms/gbms_storage.c b/google-modules/bms/gbms_storage.c
+index 670a9ef..20e9b12 100644
+--- a/google-modules/bms/gbms_storage.c
++++ b/google-modules/bms/gbms_storage.c
+@@ -551,8 +551,6 @@ int gbms_storage_offline(const char *name, bool flush)
+ EXPORT_SYMBOL_GPL(gbms_storage_offline);
+ 
+ /* ------------------------------------------------------------------------ */
+-#ifdef CONFIG_DEBUG_FS
+-
+ static int gbms_storage_show_cache(struct seq_file *m, void *data)
+ {
+ 	int bucket;
+@@ -861,8 +859,6 @@ static ssize_t debug_export_tag(struct file *filp,
+ 
+ GBMS_DEBUG_ATTRIBUTE(gbms_providers_export_ops, NULL, debug_export_tag);
+ 
+-#endif
+-
+ /* ------------------------------------------------------------------------ */
+ 
+ struct gbms_storage_device {
+diff --git a/google-modules/bms/google_battery.c b/google-modules/bms/google_battery.c
+index ce7cfbb..9412d91 100644
+--- a/google-modules/bms/google_battery.c
++++ b/google-modules/bms/google_battery.c
+@@ -7034,8 +7034,6 @@ static ssize_t charge_full_estimate_show(struct device *dev, struct device_attri
+ 
+ static DEVICE_ATTR_RO(charge_full_estimate);
+ 
+-#ifdef CONFIG_DEBUG_FS
+-
+ static int cycle_count_bins_store(void *data, u64 val)
+ {
+ 	struct batt_drv *batt_drv = (struct batt_drv *)data;
+@@ -7514,8 +7512,6 @@ static int debug_ravg_fops_write(void *data, u64 val)
+ 
+ DEFINE_SIMPLE_ATTRIBUTE(debug_ravg_fops, NULL, debug_ravg_fops_write, "%llu\n");
+ 
+-#endif
+-
+ /* ------------------------------------------------------------------------- */
+ 
+ static ssize_t debug_get_fake_temp(struct file *filp,
+diff --git a/google-modules/bms/google_bms.c b/google-modules/bms/google_bms.c
+index 939075c..bd7ddb3 100644
+--- a/google-modules/bms/google_bms.c
++++ b/google-modules/bms/google_bms.c
+@@ -33,6 +33,31 @@
+ #include "google_psy.h"
+ #include "google_bms.h"
+ 
++/* the number should be the same as GBMS_AACT_NB_LIMITS_MAX */
++static aact_limits_profiles_t aact_all_limits = {
++    .temp_limits = {
++        "google,aact-temp-limits",
++        "google,aact-temp-limits-1",
++        "google,aact-temp-limits-2",
++        "google,aact-temp-limits-3",
++        "google,aact-temp-limits-4"
++    },
++    .cv_limits = {
++        "google,aact-cv-limits",
++        "google,aact-cv-limits-1",
++        "google,aact-cv-limits-2",
++        "google,aact-cv-limits-3",
++        "google,aact-cv-limits-4"
++    },
++    .cc_limits = {
++        "google,aact-cc-limits",
++        "google,aact-cc-limits-1",
++        "google,aact-cc-limits-2",
++        "google,aact-cc-limits-3",
++        "google,aact-cc-limits-4"
++    }
++};
++
+ /* sync from google/logbuffer.c */
+ #define LOG_BUFFER_ENTRY_SIZE   256
+ 
+diff --git a/google-modules/bms/google_bms.h b/google-modules/bms/google_bms.h
+index 571f87c..82e118f 100644
+--- a/google-modules/bms/google_bms.h
++++ b/google-modules/bms/google_bms.h
+@@ -148,31 +148,6 @@ typedef struct {
+     char *cc_limits[GBMS_AACT_NB_LIMITS_MAX];
+ } aact_limits_profiles_t;
+ 
+-/* the number should be the same as GBMS_AACT_NB_LIMITS_MAX */
+-static aact_limits_profiles_t aact_all_limits = {
+-    .temp_limits = {
+-        "google,aact-temp-limits",
+-        "google,aact-temp-limits-1",
+-        "google,aact-temp-limits-2",
+-        "google,aact-temp-limits-3",
+-        "google,aact-temp-limits-4"
+-    },
+-    .cv_limits = {
+-        "google,aact-cv-limits",
+-        "google,aact-cv-limits-1",
+-        "google,aact-cv-limits-2",
+-        "google,aact-cv-limits-3",
+-        "google,aact-cv-limits-4"
+-    },
+-    .cc_limits = {
+-        "google,aact-cc-limits",
+-        "google,aact-cc-limits-1",
+-        "google,aact-cc-limits-2",
+-        "google,aact-cc-limits-3",
+-        "google,aact-cc-limits-4"
+-    }
+-};
+-
+ #define WLC_BPP_THRESHOLD_UV	7000000
+ #define WLC_EPP_THRESHOLD_UV	11000000
+ 
+diff --git a/google-modules/bms/google_charger.c b/google-modules/bms/google_charger.c
+index 5c45a2c..a743cec 100644
+--- a/google-modules/bms/google_charger.c
++++ b/google-modules/bms/google_charger.c
+@@ -35,10 +35,8 @@
+ #include "google_dc_pps.h"
+ #include "google_psy.h"
+ 
+-#ifdef CONFIG_DEBUG_FS
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+-#endif
+ 
+ #if IS_ENABLED(CONFIG_GOOGLE_CRASH_DEBUG_DUMP)
+ #include <soc/google/google-cdd.h>
+@@ -3856,8 +3854,6 @@ static int chg_vote_input_suspend(struct chg_drv *chg_drv,
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_DEBUG_FS
+-
+ static int chg_get_input_suspend(void *data, u64 *val)
+ {
+ 	struct chg_drv *chg_drv = (struct chg_drv *)data;
+@@ -4127,9 +4123,6 @@ static int bd_enabled_set(void *data, u64 val)
+ DEFINE_SIMPLE_ATTRIBUTE(bd_enabled_fops, bd_enabled_get,
+ 			bd_enabled_set, "%lld\n");
+ 
+-
+-#endif
+-
+ static int debug_get_pps_cc_tolerance(void *data, u64 *val)
+ {
+ 	struct chg_drv *chg_drv = data;
+@@ -5467,8 +5460,6 @@ state2power_table_show(struct device *dev, struct device_attribute *attr, char *
+ 
+ static DEVICE_ATTR_RO(state2power_table);
+ 
+-#ifdef CONFIG_DEBUG_FS
+-
+ static ssize_t tm_store(struct chg_thermal_device *tdev,
+ 			const char __user *user_buf,
+ 			size_t count, loff_t *ppos)
+@@ -5538,8 +5529,6 @@ static ssize_t dc_tm_store(struct file *filp, const char __user *user_buf,
+ 
+ DEBUG_ATTRIBUTE_WO(dc_tm);
+ 
+-#endif // CONFIG_DEBUG_FS
+-
+ static int chg_init_mdis_stats_map(struct chg_drv *chg_drv, const char *name) {
+ 	int rc, byte_len;
+ 
+diff --git a/google-modules/bms/google_cpm.c b/google-modules/bms/google_cpm.c
+index 124a9cc..5b44d00 100644
+--- a/google-modules/bms/google_cpm.c
++++ b/google-modules/bms/google_cpm.c
+@@ -3118,8 +3118,6 @@ static const struct thermal_cooling_device_ops chg_mdis_tcd_ops = {
+ 	.set_cur_state = gcpm_set_mdis_charge_cntl_limit,
+ };
+ 
+-#ifdef CONFIG_DEBUG_FS
+-
+ static ssize_t mdis_tm_store(struct file *filp, const char __user *user_buf,
+ 			     size_t count, loff_t *ppos)
+ {
+@@ -3360,9 +3358,6 @@ static int dc_cc_lim_store(void *data, u64 val)
+ DEFINE_SIMPLE_ATTRIBUTE(dc_cc_lim_fops, dc_cc_lim_show,
+ 			dc_cc_lim_store, "%lld\n");
+ 
+-
+-#endif // CONFIG_DEBUG_FS
+-
+ /* ------------------------------------------------------------------------- */
+ 
+ static int mdis_out_init_sel_online(u32 *out_sel, int len, const struct gcpm_drv *gcpm)
+diff --git a/google-modules/bms/google_dc_pps.c b/google-modules/bms/google_dc_pps.c
+index 5649d77..79b3d43 100644
+--- a/google-modules/bms/google_dc_pps.c
++++ b/google-modules/bms/google_dc_pps.c
+@@ -25,10 +25,8 @@
+ #include "google_dc_pps.h"
+ #include <linux/usb/max77759_export.h>
+ 
+-#ifdef CONFIG_DEBUG_FS
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+-#endif
+ 
+ #define PPS_UPDATE_DELAY_MS		2000
+ 
 diff --git a/google-modules/display/common/include/gs_drm/gs_display_mode.h b/google-modules/display/common/include/gs_drm/gs_display_mode.h
 index d279409..5b05571 100644
 --- a/google-modules/display/common/include/gs_drm/gs_display_mode.h
