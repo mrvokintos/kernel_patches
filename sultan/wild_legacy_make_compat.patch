@@ -1,0 +1,185 @@
+diff --git a/google-modules/amplifiers/cs35l41/Makefile b/google-modules/amplifiers/cs35l41/Makefile
+index ce4bcab..1bab609 100644
+--- a/google-modules/amplifiers/cs35l41/Makefile
++++ b/google-modules/amplifiers/cs35l41/Makefile
+@@ -10,7 +10,7 @@ obj-$(CONFIG_SND_SOC_CS35L41_I2C)	+= snd-soc-cs35l41-i2c.o
+ KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
+ M ?= $(shell pwd)
+ 
+-EXTRA_CFLAGS += -I$(KERNEL_SRC)/$(M)/include/
++EXTRA_CFLAGS += -I$(srctree)/$(src)/include/
+ EXTRA_CFLAGS += -I$(ROOT_DIR)/private/google-modules/amplifiers/snd_soc_wm_adsp
+ EXTRA_SYMBOLS += $(COMMON_OUT_DIR)/private/google-modules/amplifiers/snd_soc_wm_adsp/Module.symvers
+ 
+diff --git a/google-modules/display/common/include/gs_drm/gs_display_mode.h b/google-modules/display/common/include/gs_drm/gs_display_mode.h
+index d279409..5b05571 100644
+--- a/google-modules/display/common/include/gs_drm/gs_display_mode.h
++++ b/google-modules/display/common/include/gs_drm/gs_display_mode.h
+@@ -93,7 +93,7 @@
+  * This macro checks drm clock value is divisible by 1000, and returns (drm clock value/1000).
+  */
+ #define CALC_DRM_CLOCK_K_HZ(CLOCK) \
+-	(CHECK_DRM_CLOCK_DIVISIBLE_1000(CLOCK) + (CLOCK / 1000))
++	(CLOCK / 1000)
+ 
+ /**
+  * DRM_MODE_TIMING() - fills in timing parameters in struct drm_display_mode
+diff --git a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c b/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c
+index 88890a6..c8e5bf7 100644
+--- a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c
++++ b/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c
+@@ -21,6 +21,7 @@
+ #include <linux/pm_opp.h>
+ #include <linux/suspend.h>
+ #include <linux/platform_device.h>
++#include <linux/tensor_aio.h>
+ 
+ #include <soc/google/cal-if.h>
+ #include <soc/google/ect_parser.h>
+@@ -121,6 +122,66 @@ static unsigned int get_freq(struct exynos_cpufreq_domain *domain)
+ 	return freq;
+ }
+ 
++#ifdef CONFIG_ARM_TENSOR_AIO_DEVFREQ
++void exynos_acme_rate_info(struct exynos_cpufreq_domain *domain,
++			   struct exynos_acme_rate *r)
++{
++	lockdep_assert_irqs_disabled();
++
++	/* Copy out info about the last rate change for this domain */
++	read_lock(&domain->rate_info_lock);
++	*r = domain->rate_info;
++	read_unlock(&domain->rate_info_lock);
++}
++
++void exynos_acme_rate_latched(struct exynos_cpufreq_domain *domain,
++			      const struct exynos_acme_rate *cookie)
++{
++	lockdep_assert_irqs_disabled();
++
++	/* Clear out the transition info if the last target rate latched */
++	write_lock(&domain->rate_info_lock);
++	if (domain->rate_info.set_time == cookie->set_time &&
++	    domain->rate_info.freq == cookie->freq)
++		domain->rate_info.set_time = 0;
++	write_unlock(&domain->rate_info_lock);
++}
++
++static int domain_set_rate(struct exynos_cpufreq_domain *domain,
++			   unsigned long rate)
++{
++	unsigned long flags;
++	int ret;
++
++	/*
++	 * Set the new rate and update the transition info if it succeeds. This
++	 * is done with IRQs disabled so that an interrupt cannot fire after
++	 * cal_dfs_set_rate() and mess up the recorded transition time.
++	 */
++	local_irq_save(flags);
++	ret = cal_dfs_set_rate(domain->cal_id, rate);
++	if (!ret) {
++		u64 now = __arch_counter_get_cntpct();
++
++		write_lock(&domain->rate_info_lock);
++		/* Only update the time if the previous rate switch latched */
++		if (!domain->rate_info.set_time)
++			domain->rate_info.set_time = now;
++		domain->rate_info.freq = rate;
++		write_unlock(&domain->rate_info_lock);
++	}
++	local_irq_restore(flags);
++
++	return ret;
++}
++#else
++static int domain_set_rate(struct exynos_cpufreq_domain *domain,
++			   unsigned long rate)
++{
++	return cal_dfs_set_rate(domain->cal_id, rate);
++}
++#endif
++
+ static int set_freq(struct exynos_cpufreq_domain *domain,
+ 		    unsigned int target_freq)
+ {
+@@ -132,7 +193,7 @@ static int set_freq(struct exynos_cpufreq_domain *domain,
+ 	if (domain->need_awake)
+ 		disable_power_mode(cpumask_any(&domain->cpus), POWERMODE_TYPE_CLUSTER);
+ 
+-	err = cal_dfs_set_rate(domain->cal_id, target_freq);
++	err = domain_set_rate(domain, target_freq);
+ 	if (err < 0) {
+ 		pr_err("failed to scale frequency of domain%d (%d -> %d)\n",
+ 		       domain->id, domain->old, target_freq);
+@@ -198,11 +259,19 @@ static void apply_thermal_pressure(struct exynos_cpufreq_domain *domain,
+ 	cpumask_t *maskp;
+ 	unsigned long arch_capped_freq;
+ 
+-	if (!domain || (domain->capped_freq[thermal_actor] == capped_freq))
++	if (!domain)
+ 		return;
+ 
+ 	maskp = &domain->cpus;
+ 
++	if (IS_ENABLED(CONFIG_ARM_TENSOR_AIO_DEVFREQ)) {
++		tensor_aio_cpufreq_pressure(cpumask_any(maskp), capped_freq);
++		return;
++	}
++
++	if (domain->capped_freq[thermal_actor] == capped_freq)
++		return;
++
+ 	spin_lock(&domain->thermal_update_lock);
+ 	domain->capped_freq[thermal_actor] = capped_freq;
+ 	arch_capped_freq = min(domain->capped_freq[TJ], domain->capped_freq[TSKIN]);
+@@ -280,6 +349,13 @@ static int exynos_cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->dvfs_possible_from_any_cpu = true;
+ 	cpumask_copy(policy->cpus, &domain->cpus);
+ 
++#ifdef CONFIG_ARM_TENSOR_AIO_DEVFREQ
++	/* rate_info_lock would need to be a raw lock on RT */
++	BUILD_BUG_ON(IS_ENABLED(CONFIG_PREEMPT_RT));
++	rwlock_init(&domain->rate_info_lock);
++	tensor_aio_init_cpu_domain(domain);
++#endif
++
+ 	pr_info("CPUFREQ domain%d registered\n", domain->id);
+ 
+ 	return 0;
+diff --git a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.h b/google-modules/soc/gs/drivers/cpufreq/exynos-acme.h
+index 7a077f3..b18e96d 100644
+--- a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.h
++++ b/google-modules/soc/gs/drivers/cpufreq/exynos-acme.h
+@@ -37,6 +37,19 @@ struct exynos_cpufreq_file_operations {
+ 	unsigned int			default_value;
+ };
+ 
++#ifdef CONFIG_ARM_TENSOR_AIO_DEVFREQ
++struct exynos_acme_rate {
++	u64 set_time;
++	unsigned int freq;
++};
++
++struct exynos_cpufreq_domain;
++void exynos_acme_rate_info(struct exynos_cpufreq_domain *domain,
++			   struct exynos_acme_rate *r);
++void exynos_acme_rate_latched(struct exynos_cpufreq_domain *domain,
++			      const struct exynos_acme_rate *cookie);
++#endif
++
+ enum thermal_actors {
+ 	TJ = 0,
+ 	TSKIN = 1
+@@ -97,6 +110,11 @@ struct exynos_cpufreq_domain {
+ 	unsigned long capped_freq[NR_THERMAL_ACTORS];
+ 	char capped_freq_name[NR_THERMAL_ACTORS][THERMAL_PRESSURE_STR_LEN];
+ 	unsigned int ect_table_offset;
++
++#ifdef CONFIG_ARM_TENSOR_AIO_DEVFREQ
++	struct exynos_acme_rate rate_info;
++	rwlock_t rate_info_lock;
++#endif
+ };
+ 
+ /*
