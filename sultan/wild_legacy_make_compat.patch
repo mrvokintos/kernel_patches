@@ -18,6 +18,44 @@ diff --git a/google-modules/aoc/alsa/Makefile b/google-modules/aoc/alsa/Makefile
 +EXTRA_CFLAGS	+= -I$(srctree)/sound/usb
  EXTRA_CFLAGS	+= -I$(KERNEL_SRC)/sound/usb
  EXTRA_CFLAGS	+= -I$(ROOT_DIR)/private/google-modules/amplifiers/audiometrics
+diff --git a/google-modules/amplifiers/cs40l26/cs40l26-i2c.c b/google-modules/amplifiers/cs40l26/cs40l26-i2c.c
+index 9582113..5e7531b 100644
+--- a/google-modules/amplifiers/cs40l26/cs40l26-i2c.c
++++ b/google-modules/amplifiers/cs40l26/cs40l26-i2c.c
+@@ -12,6 +12,8 @@
+ 
+ #include "cs40l26.h"
+ 
++static int cs40l26_probed_retry_count[CS40L26_MAX_DEVICES];
++
+ static const struct i2c_device_id cs40l26_id_i2c[] = {
+ 	{"cs40l26a", 0},
+ 	{"cs40l26b", 1},
+diff --git a/google-modules/amplifiers/cs40l26/cs40l26.c b/google-modules/amplifiers/cs40l26/cs40l26.c
+index 19243bf..d53b32a 100644
+--- a/google-modules/amplifiers/cs40l26/cs40l26.c
++++ b/google-modules/amplifiers/cs40l26/cs40l26.c
+@@ -677,7 +677,7 @@ static irqreturn_t cs40l26_handle_mbox_buffer(int irq, void *data)
+ 	irqreturn_t irq_status = IRQ_HANDLED;
+ 	struct device *dev = cs40l26->dev;
+ 	u32 val = 0;
+-	int error;
++	int __maybe_unused error;
+ 
+ 	mutex_lock(&cs40l26->lock);
+ 
+diff --git a/google-modules/amplifiers/cs40l26/cs40l26.h b/google-modules/amplifiers/cs40l26/cs40l26.h
+index 8a07bd8..f00c7ad 100644
+--- a/google-modules/amplifiers/cs40l26/cs40l26.h
++++ b/google-modules/amplifiers/cs40l26/cs40l26.h
+@@ -1320,7 +1320,6 @@ int cs40l26_wseq_write(struct cs40l26_private *cs40l26, u32 addr, u32 data,
+ int cs40l26_copy_f0_est_to_dvl(struct cs40l26_private *cs40l26);
+ int cs40l26_rom_wt_init(struct cs40l26_private *cs40l26);
+ 
+-static int cs40l26_probed_retry_count[CS40L26_MAX_DEVICES];
+ void cs40l26_add_codec_devices(struct device *dev);
+ 
+ /* external tables */
 diff --git a/google-modules/display/common/include/gs_drm/gs_display_mode.h b/google-modules/display/common/include/gs_drm/gs_display_mode.h
 index d279409..5b05571 100644
 --- a/google-modules/display/common/include/gs_drm/gs_display_mode.h
