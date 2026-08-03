@@ -1,0 +1,32 @@
+--- a/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
++++ b/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
+@@ -2127,7 +2127,7 @@ index ba7926d7b..efd4a2772 100644
+  	kruid = make_kuid(ns, ruid);
+  	keuid = make_kuid(ns, euid);
+  	ksuid = make_kuid(ns, suid);
+-@@ -1298,12 +1305,21 @@ static int override_release(char __user *release, size_t len)
++@@ -1298,6 +1305,11 @@ static int override_release(char __user *release, size_t len)
+  	return ret;
+  }
+  
+@@ -2139,6 +2139,9 @@ index ba7926d7b..efd4a2772 100644
+  SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
+  {
+  	struct new_utsname tmp;
++@@ -1304,8 +1316,12 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
++ 	struct task_struct *t;
++ 	bool is_gms = false;
+  
+  	down_read(&uts_sem);
+  	memcpy(&tmp, utsname(), sizeof(tmp));
+@@ -2147,8 +2150,8 @@ index ba7926d7b..efd4a2772 100644
+ +		susfs_spoof_uname(&tmp);
+ +#endif
+  	up_read(&uts_sem);
+- 	if (copy_to_user(name, &tmp, sizeof(tmp)))
+- 		return -EFAULT;
++ 
++ 	rcu_read_lock();
+ diff --git a/mm/memory.c b/mm/memory.c
+ index 58cd1a431..0be8de3f1 100644
+ --- a/mm/memory.c
