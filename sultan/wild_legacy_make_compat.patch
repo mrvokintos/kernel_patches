@@ -1,16 +1,23 @@
 diff --git a/google-modules/amplifiers/cs35l41/Makefile b/google-modules/amplifiers/cs35l41/Makefile
-index ce4bcab..1bab609 100644
 --- a/google-modules/amplifiers/cs35l41/Makefile
 +++ b/google-modules/amplifiers/cs35l41/Makefile
-@@ -10,7 +10,7 @@ obj-$(CONFIG_SND_SOC_CS35L41_I2C)	+= snd-soc-cs35l41-i2c.o
- KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
- M ?= $(shell pwd)
- 
--EXTRA_CFLAGS += -I$(KERNEL_SRC)/$(M)/include/
+@@ -13,2 +13,3 @@
 +EXTRA_CFLAGS += -I$(srctree)/$(src)/include/
+ EXTRA_CFLAGS += -I$(KERNEL_SRC)/$(M)/include/
  EXTRA_CFLAGS += -I$(ROOT_DIR)/private/google-modules/amplifiers/snd_soc_wm_adsp
- EXTRA_SYMBOLS += $(COMMON_OUT_DIR)/private/google-modules/amplifiers/snd_soc_wm_adsp/Module.symvers
- 
+diff --git a/google-modules/amplifiers/cs35l45/Makefile b/google-modules/amplifiers/cs35l45/Makefile
+--- a/google-modules/amplifiers/cs35l45/Makefile
++++ b/google-modules/amplifiers/cs35l45/Makefile
+@@ -17,1 +17,2 @@
++EXTRA_CFLAGS += -I$(srctree)/$(src)/include/
+ EXTRA_CFLAGS += -I$(KERNEL_SRC)/$(M)/include/
+diff --git a/google-modules/aoc/alsa/Makefile b/google-modules/aoc/alsa/Makefile
+--- a/google-modules/aoc/alsa/Makefile
++++ b/google-modules/aoc/alsa/Makefile
+@@ -10,2 +10,3 @@
++EXTRA_CFLAGS	+= -I$(srctree)/sound/usb
+ EXTRA_CFLAGS	+= -I$(KERNEL_SRC)/sound/usb
+ EXTRA_CFLAGS	+= -I$(ROOT_DIR)/private/google-modules/amplifiers/audiometrics
 diff --git a/google-modules/display/common/include/gs_drm/gs_display_mode.h b/google-modules/display/common/include/gs_drm/gs_display_mode.h
 index d279409..5b05571 100644
 --- a/google-modules/display/common/include/gs_drm/gs_display_mode.h
@@ -24,6 +31,15 @@ index d279409..5b05571 100644
  
  /**
   * DRM_MODE_TIMING() - fills in timing parameters in struct drm_display_mode
+diff --git a/google-modules/soc/gs/Makefile.include b/google-modules/soc/gs/Makefile.include
+--- a/google-modules/soc/gs/Makefile.include
++++ b/google-modules/soc/gs/Makefile.include
+@@ -6,2 +6,5 @@
++subdir-ccflags-y += -I$(ROOT_DIR)/private/google-modules/soc/gs/include
++subdir-ccflags-y += -I$(ROOT_DIR)/private/google-modules/soc/gs/include/uapi
++
+ KCFLAGS += -I$(ROOT_DIR)/private/google-modules/soc/gs/include
+ KCFLAGS += -I$(ROOT_DIR)/private/google-modules/soc/gs/include/uapi
 diff --git a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c b/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c
 index 88890a6..c8e5bf7 100644
 --- a/google-modules/soc/gs/drivers/cpufreq/exynos-acme.c
